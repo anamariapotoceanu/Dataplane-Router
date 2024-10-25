@@ -1,40 +1,22 @@
 ## Tema 1 - Dataplane Router
 
+- **Verificarea tipului pachetului**: Se verifică tipul pachetului primit. Dacă se constată că este de tipul IPv4, se apelează funcția corespunzătoare (`function_ipv4`).
+  
+- **Procesarea pachetului IPv4**:
+  - În cadrul acestei funcții, inițial am verificat dacă pachetul are ca destinație routerul și dacă primește un mesaj destinat lui (type 8 pentru ICMP). În acest caz, routerul nu trimite pachetul mai departe, ci va încerca să-l proceseze (`verify_destination_icmp`).
+  - Următorul pas a fost verificarea sumelor. Dacă suma diferă de cea primită în antet, înseamnă că pachetul a fost corupt și nu va fi trimis mai departe.
+  - Pentru TTL, am verificat dacă este mai mic sau egal cu 0, ceea ce înseamnă că pachetul nu poate fi trimis mai departe. Altfel, am decrementat TTL-ul.
+  - Am căutat în tabela de rutare adresa următorului hop. Dacă nu avem rută, se trimite un mesaj ICMP de tip 3. Am folosit metoda de căutare binară pentru a găsi ruta; prima dată am sortat tabela de rutare în funcție de prefix și mască.
+  - Dacă reușim să găsim adresa următorului hop, căutăm în tabela ARP adresa MAC corespunzătoare pentru a putea trimite pachetul.
+  - Înainte de a trimite pachetul, ne asigurăm că suma este recalculată, setăm adresele MAC sursă și destinație și trimitem pachetul pe interfata următorului hop găsit anterior.
 
-* Se verifica tipul pachetului primit. Daca se constanta ca este de tipul IPv4,
-atunci se apeleaza functia corespunzatore (function_ipv4).
-- In cadrul acestei functii, initial am verificat daca pachetul are ca
-destinatie routerul si daca primeste un mesaj destinat lui (type 8 pentru
-ICMP). In acest caz, routerul nu trimite pachetul mai departe, ci va incerca
-sa-l proceseze (verify_destination_icmp). 
-- Urmatorul pas a fost verificarea sumelor. In cazul in care suma difera de cea
-primita in antet, inseamna ca pachetul a fost corupt, deci nu va fi trimis mai
-departe.
-- Pentru TTL, am verificat daca este mai mic sau egal decat 0, adica daca nu
-poate fi trimis mai departe. Altfel, am decrementat TTL. 
-- Mai departe, am cautat in tabela de rutare, adresa urmatorului hop. Daca se
-constata ca nu avem ruta, se trimite un mesaj de tipul ICMP, type 3. Pentru
-cautarea in tabela de rutare, am folosit metoda binary search. Pentru a face
-eficienta cautarea, prima data am sortat tabela de rutare in functie de prefix
-si de masca.
-- Daca reusim sa gasim adresa urmatorului hop, cautam in tabela arp, adresa MAC
-corespunzatoare pentru a putea trimite pachetul. 
-- Inainte de trimiterea pachetului, ne asiguram ca suma este recalculata.
-Se seteaza adresele MAC sursa si destinatie. Se trimite pachetul pe interfata
-urmatorului hop gasit anterior.
+- **Trimiterea pachetelor ICMP**: Am creat o funcție (`function_icmp`) care, în funcție de tipul mesajului, va seta tipul corespunzător și codul specific:
+  - Tipul 3 corespunde cazului când nu se găsește destinația.
+  - Tipul 0 este pentru mesajul primit de router care trebuie să-și răspundă lui însuși.
+  - Tipul 11 este pentru TTL.
+  
+  Pentru fiecare pachet ICMP, se va seta în antetul ICMP tipul și codul, iar câmpul protocol din antetul IP este dedicat mesajelor ICMP.
 
-* Pentru trimiterea pachetelor de tipul ICMP, am creat o functie function_icmp,
-care in functie de tipul mesajului, va seta tipul corespunzator si codul
-specific. Tipul 3 este corespunzator cazului cand nu se gaseste destinatia,
-tipul 0 este atunci cand routerul primeste un mesaj si trebuie sa-si raspunda
-lui insusi, iar ultimul tip, 11 este pentru TTL. Pentru fiecare pachet ICMP, se
-va seta in antentul ICMP tipul si codul. De asemenea, campul protocol din
-antetul IP este dedicat tot mesajelor ICMP. 
-* Pentru trimiterea pachetelor, este necesara construirea celor trei anteturi.
-Destinatia va fi noua sursa, iar vechea sursa este noua destinatie. Pentru a
-retine aceste aspecte, m-am folosit de copii ale anteturilor ether_header_copy
-si ip_header_copy. De asemenea, am recalculat sumele pentru cele doua anteturi.
-Lungimea pachetului care va fi trimis, va fi lungimea pachetului initial la
-care se va adauga dimensiunea structurii struct icmphdr. Pentru trimitea
-pachetului, am creat un nou pachet cu continutul, interfata si lungimea
-necesara.
+- **Construirea anteturilor**: Pentru trimiterea pachetelor, este necesară construirea celor trei anteturi. Destinația va fi noua sursă, iar vechea sursă va deveni noua destinație. Am utilizat copii ale anteturilor `ether_header_copy` și `ip_header_copy` pentru a reține aceste aspecte și am recalculat sumele pentru cele două anteturi. 
+  - Lungimea pachetului care va fi trimis este lungimea pachetului inițial la care se adaugă dimensiunea structurii `struct icmphdr`. 
+  - În final, am creat un nou pachet cu conținutul, interfata și lungimea necesară pentru trimiterea pachetului.
