@@ -1,22 +1,41 @@
-## Dataplane Router
 
-- **Packet Type Check**: The type of the received packet is verified. If it is determined to be of type IPv4, the corresponding function (`function_ipv4`) is called.
+##  Dataplane Router
 
-- **Processing IPv4 Packet**:
-  - Within this function, I first checked whether the packet's destination is the router and if it receives a message intended for it (type 8 for ICMP). In this case, the router does not forward the packet but attempts to process it (`verify_destination_icmp`).
-  - The next step was to verify the checksums. If the checksum differs from the one received in the header, it means the packet has been corrupted and will not be forwarded.
-  - For TTL, I checked if it is less than or equal to 0, which means the packet cannot be forwarded. Otherwise, I decremented the TTL.
-  - I looked up the next hop address in the routing table. If no route is found, an ICMP type 3 message is sent. I used a binary search method to find the route; first, I sorted the routing table based on the prefix and mask.
-  - If we successfully find the next hop address, we look up the corresponding MAC address in the ARP table to send the packet.
-  - Before sending the packet, we ensure that the checksum is recalculated, set the source and destination MAC addresses, and send the packet through the interface of the previously found next hop.
 
-- **Sending ICMP Packets**: I created a function (`function_icmp`) that, depending on the type of the message, will set the appropriate type and specific code:
-  - Type 3 corresponds to the case when the destination cannot be found.
-  - Type 0 is for the message received by the router that needs to respond to itself.
-  - Type 11 is for TTL.
+* Se verifica tipul pachetului primit. Daca se constanta ca este de tipul IPv4,
+atunci se apeleaza functia corespunzatore (function_ipv4).
+- In cadrul acestei functii, initial am verificat daca pachetul are ca
+destinatie routerul si daca primeste un mesaj destinat lui (type 8 pentru
+ICMP). In acest caz, routerul nu trimite pachetul mai departe, ci va incerca
+sa-l proceseze (verify_destination_icmp). 
+- Urmatorul pas a fost verificarea sumelor. In cazul in care suma difera de cea
+primita in antet, inseamna ca pachetul a fost corupt, deci nu va fi trimis mai
+departe.
+- Pentru TTL, am verificat daca este mai mic sau egal decat 0, adica daca nu
+poate fi trimis mai departe. Altfel, am decrementat TTL. 
+- Mai departe, am cautat in tabela de rutare, adresa urmatorului hop. Daca se
+constata ca nu avem ruta, se trimite un mesaj de tipul ICMP, type 3. Pentru
+cautarea in tabela de rutare, am folosit metoda binary search. Pentru a face
+eficienta cautarea, prima data am sortat tabela de rutare in functie de prefix
+si de masca.
+- Daca reusim sa gasim adresa urmatorului hop, cautam in tabela arp, adresa MAC
+corespunzatoare pentru a putea trimite pachetul. 
+- Inainte de trimiterea pachetului, ne asiguram ca suma este recalculata.
+Se seteaza adresele MAC sursa si destinatie. Se trimite pachetul pe interfata
+urmatorului hop gasit anterior.
 
-  For each ICMP packet, the type and code will be set in the ICMP header, and the protocol field in the IP header is dedicated to ICMP messages.
-
-- **Header Construction**: To send packets, it is necessary to construct the three headers. The destination will be the new source, and the old source will become the new destination. I used copies of the `ether_header_copy` and `ip_header_copy` headers to retain these aspects and recalculated the checksums for the two headers.
-  - The length of the packet to be sent is the length of the original packet plus the size of the `struct icmphdr` structure.
-  - Finally, I created a new packet with the content, interface, and required length for sending the packet.
+* Pentru trimiterea pachetelor de tipul ICMP, am creat o functie function_icmp,
+care in functie de tipul mesajului, va seta tipul corespunzator si codul
+specific. Tipul 3 este corespunzator cazului cand nu se gaseste destinatia,
+tipul 0 este atunci cand routerul primeste un mesaj si trebuie sa-si raspunda
+lui insusi, iar ultimul tip, 11 este pentru TTL. Pentru fiecare pachet ICMP, se
+va seta in antentul ICMP tipul si codul. De asemenea, campul protocol din
+antetul IP este dedicat tot mesajelor ICMP. 
+* Pentru trimiterea pachetelor, este necesara construirea celor trei anteturi.
+Destinatia va fi noua sursa, iar vechea sursa este noua destinatie. Pentru a
+retine aceste aspecte, m-am folosit de copii ale anteturilor ether_header_copy
+si ip_header_copy. De asemenea, am recalculat sumele pentru cele doua anteturi.
+Lungimea pachetului care va fi trimis, va fi lungimea pachetului initial la
+care se va adauga dimensiunea structurii struct icmphdr. Pentru trimitea
+pachetului, am creat un nou pachet cu continutul, interfata si lungimea
+necesara.
